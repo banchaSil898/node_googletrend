@@ -18,7 +18,7 @@ dotenv.config()
 const tokens = [ process.env.TOKEN_FOR_MY_TEST, process.env.TOKEN_FOR_DGTL_STG]
 
 
-app.get("/", (req, res) => {
+app.get("/linenoti-googletrends", (req, res) => {
   const thDateStrine = new Date().toLocaleDateString('th-TH', {year:'2-digit', month:'short',day:'numeric'})
   const thTimetrine = new Date().toLocaleTimeString('th-TH', {hour:'2-digit'})
   const googletrenddata = new Promise(async (resolve, reject) => {

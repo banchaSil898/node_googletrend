@@ -1,0 +1,75 @@
+var express = require("express")
+var app = express()
+const xml2js = require('xml2js')
+const axios = require('axios')
+const cheerio = require('cheerio')
+const dotenv = require('dotenv')
+const options = {
+  method: 'GET',
+  url: `https://trends.google.com/trends/trendingsearches/daily/rss?geo=TH`,
+  header: {
+    'X-RapidAPI-Host': `trends.google.com`
+  }
+}
+
+dotenv.config()
+
+const tokens = [process.env.TOKEN_FOR_DGTL_STG, process.env.TOKEN_FOR_MY_TEST]
+
+
+app.get("/linenoti-googletrends", (req, res) => { 
+  const thDateStrine = new Date().toLocaleDateString('th-TH', {year:'2-digit', month:'short',day:'numeric'})
+  const thTimetrine = new Date().toLocaleTimeString('th-TH', {hour:'2-digit'})
+  const googletrenddata = new Promise(async (resolve, reject) => {
+    const response = await axios.request(options)
+    const data = response.data
+    const jsonObject = await xml2js.parseStringPromise(data)// data ที่ได้มา จะได้มาเป็น xml ก็เลยใช้ xml2js มาแปลงมันเป็น object
+    const results = jsonObject.rss.channel[0].item
+      
+    const filteredResults = results.map((item) => ({
+      title : item.title[0],
+      description : item.description[0].split(',').slice(0,3).join(', ')
+    }))
+    resolve(filteredResults)
+  })
+  googletrenddata
+  .then( async (result)=>{
+    let roundExpect = 0 //0-9
+    
+    while (roundExpect < 10) {
+      let msgHeader = `10 อันดับ (${roundExpect +1} - ${roundExpect +5}) (${thDateStrine}, ${thTimetrine}:00 น. ส่งเทสต์แบบหลายกลุ่มครับ )`
+      let mainContent = '';
+      for (let index = 0; index < 5; index++) {
+        const lineTitle = result[roundExpect].title
+        const lineDesctiption = result[roundExpect].description ? ` (คำที่เกี่ยวข้อง ${result[roundExpect].description})` : ''
+        mainContent += `${roundExpect +1}. ${lineTitle}${ lineDesctiption}` + "\n"
+        roundExpect++
+      }
+      tokens.forEach(async token => {
+        await axios({
+          method: 'post',
+          url: 'https://notify-api.line.me/api/notify',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': `Bearer ${token}`,
+          },
+          data: "message=" + msgHeader + "\n\n" + mainContent,
+        })
+        .catch(function (error) {
+          if (error.response) {
+            console.log(error.response.data);
+            console.log(error.response.status);
+            console.log(error.response.headers);
+          }
+        })
+      });
+    }
+    res.status(200).send({ message: 'Success' });
+  })
+  .catch((err)=>{err})
+})
+
+app.listen(process.env.PORT, () => {
+  console.log(`server listening on port ${process.env.PORT}`);
+});
+// 8oufiXb8XQk61i0wGiVxnq6uQ5o22R42XDlFIKGQIY0
